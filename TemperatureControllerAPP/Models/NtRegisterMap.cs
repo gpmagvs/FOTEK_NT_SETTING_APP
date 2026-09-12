@@ -29,7 +29,7 @@ public static class NtRegisterMap
     /// <summary>規格書左欄：0x0001–0x000E</summary>
     public static ObservableCollection<RegisterParameter> CreateColumn1() =>
     [
-        P(0x0001, "Lck", "Lock setting", "0~3"),
+        P(0x0001, "Lck", "Lock setting", "0~3 · 關鍵設定", critical: true),
         P(0x0002, "AL1", "#1 alarm", "-0999~9999", signed: true),
         P(0x0003, "AL2", "#2 alarm", "-0999~9999", signed: true),
         P(0x0004, "tnr", "Process timer", "Read only / Alarm mode", readOnly: true),
@@ -64,14 +64,14 @@ public static class NtRegisterMap
         P(HeatingCooling, "H_C", "Heating/Cooling", "0=Heating, 1=Cooling · 預設=1",
             preferred: 1, site: true, edit: "1", kind: ValueDisplayKind.EnumMap),
         P(0x001C, "ALT", "Alarm mode", "00–18"),
-        P(0x001D, "Id", "Station No.", "01H–FFH"),
+        P(0x001D, "Id", "Station No.", "01H–FFH · 關鍵設定", critical: true),
         P(0x001E, "RS", "Communication mode", "Refer to manual")
     ];
 
     /// <summary>規格書右欄：通訊 / SV / PV / 狀態</summary>
     public static ObservableCollection<RegisterParameter> CreateColumn3() =>
     [
-        P(0x001F, "bPS", "Baud rate", "Refer to manual"),
+        P(0x001F, "bPS", "Baud rate", "Refer to manual · 關鍵設定", critical: true),
         P(0x0020, "bit", "Data configuration", "Parity / stop bits"),
         P(0x0021, "Ft", "Filter / Deadband", "Ft 1–50; db 0–9999"),
         P(Sv, "SV", "Setting value", "-0999~9999", signed: true, kind: ValueDisplayKind.DecimalPointAware),
@@ -155,6 +155,7 @@ public static class NtRegisterMap
         ValueDisplayKind kind = ValueDisplayKind.Raw,
         ushort? preferred = null,
         bool site = false,
+        bool critical = false,
         string? edit = null)
     {
         var p = new RegisterParameter
@@ -167,7 +168,8 @@ public static class NtRegisterMap
             IsSigned = signed,
             DisplayKind = kind,
             PreferredDefault = preferred,
-            IsSiteDefault = site
+            IsSiteDefault = site,
+            IsCritical = critical || site
         };
         if (edit is not null)
             p.EditValue = edit;

@@ -23,8 +23,13 @@ public sealed class RegisterParameter : INotifyPropertyChanged
     public bool CanWrite => !IsReadOnly;
     public bool IsSigned { get; init; }
     public bool IsSiteDefault { get; init; }
+    /// <summary>關鍵設定（非站點預設列，如 Lck / Id / bPS）。</summary>
+    public bool IsCritical { get; init; }
     public ushort? PreferredDefault { get; init; }
     public ValueDisplayKind DisplayKind { get; init; } = ValueDisplayKind.Raw;
+
+    /// <summary>0=一般, 1=關鍵設定, 2=站點預設（供列樣式綁定）。</summary>
+    public int HighlightLevel => IsSiteDefault ? 2 : IsCritical ? 1 : 0;
 
     public string CurrentValue
     {

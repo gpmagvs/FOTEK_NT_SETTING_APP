@@ -24,12 +24,21 @@ public partial class MainWindow : Window
     private bool _suppressControllerEvent;
     private bool _busy;
     private bool _loadingProfiles;
+    private bool _handlingCommLoss;
     private DateTime _lastParamPollUtc = DateTime.MinValue;
 
-    private static readonly SolidColorBrush LampOff = new(Color.FromRgb(0xC9, 0xD1, 0xD9));
-    private static readonly SolidColorBrush LampOnGreen = new(Color.FromRgb(0x22, 0xC5, 0x5E));
-    private static readonly SolidColorBrush LampOnRed = new(Color.FromRgb(0xEF, 0x44, 0x44));
-    private static readonly SolidColorBrush LampOnOrange = new(Color.FromRgb(0xF5, 0x9E, 0x0B));
+    private static readonly SolidColorBrush LampOff = new(Color.FromRgb(0x47, 0x55, 0x69));
+    private static readonly SolidColorBrush LampOnGreen = new(Color.FromRgb(0x34, 0xD3, 0x99));
+    private static readonly SolidColorBrush LampOnRed = new(Color.FromRgb(0xF8, 0x71, 0x71));
+    private static readonly SolidColorBrush LampOnOrange = new(Color.FromRgb(0xFB, 0xBF, 0x24));
+    private static readonly SolidColorBrush ConnOkBrush = new(Color.FromRgb(0x34, 0xD3, 0x99));
+    private static readonly SolidColorBrush ConnIdleBrush = new(Color.FromRgb(0x94, 0xA3, 0xB8));
+    private static readonly SolidColorBrush ConnErrBrush = new(Color.FromRgb(0xF8, 0x71, 0x71));
+    private static readonly SolidColorBrush PvOkBrush = new(Color.FromRgb(0x34, 0xD3, 0x99));
+    private static readonly SolidColorBrush PvDangerBrush = new(Color.FromRgb(0xF8, 0x71, 0x71));
+
+    private ushort? _lastPvRaw;
+    private ushort? _lastSvRaw;
 
     public MainWindow()
     {
@@ -41,6 +50,11 @@ public partial class MainWindow : Window
         LampOff.Freeze();
         LampOnGreen.Freeze();
         LampOnRed.Freeze();
+        ConnOkBrush.Freeze();
+        ConnIdleBrush.Freeze();
+        ConnErrBrush.Freeze();
+        PvOkBrush.Freeze();
+        PvDangerBrush.Freeze();
         LampOnOrange.Freeze();
 
         GridCol1.ItemsSource = NtRegisterMap.CreateColumn1();
@@ -73,9 +87,13 @@ public partial class MainWindow : Window
         PanelTcp.Visibility = useTcp ? Visibility.Visible : Visibility.Collapsed;
         LblUnitId.Text = useTcp ? "Unit ID" : "Slave ID";
         if (!_modbus.IsConnected)
-            SetStatus(useTcp
-                ? "Modbus TCP：輸入閘道 IP（預設 Port 502），Unit ID 對應溫控器站號。"
-                : "Modbus RTU：選擇 COM 埠後連線。");
+        {
+            var hint = useTcp
+                ? "TCP：填寫閘道 IP 後連線"
+                : "RTU：選擇 COM 後連線";
+            SetStatus(hint);
+            TxtConnHint.Text = hint;
+        }
     }
 
     private bool IsTcpMode => RbTcp.IsChecked == true;
@@ -354,12 +372,14 @@ public partial class MainWindow : Window
 
             SetUiConnected(true);
             SetStatus(statusText + "  ·  正在讀取裝置資料…");
+            TxtConnHint.Text = "讀取中…";
             TxtConnectionState.Text = IsTcpMode ? "已連線 (TCP)" : "已連線 (RTU)";
-            TxtConnectionState.Foreground = new SolidColorBrush(Color.FromRgb(0x0B, 0x6E, 0x4F));
+            TxtConnectionState.Foreground = ConnOkBrush;
             _log.Info(statusText);
 
             await InitialReadAfterConnectAsync();
             TglPolling.IsChecked = true;
+            TxtConnHint.Text = "已連線 · 輪詢中";
             SaveAppSettings();
         }
         catch (Exception ex)
@@ -367,6 +387,7 @@ public partial class MainWindow : Window
             _modbus.Disconnect();
             SetUiConnected(false);
             SetStatus($"連線失敗：{ex.Message}");
+            TxtConnHint.Text = "連線失敗";
             _log.Error($"連線失敗：{ex.Message}");
             SaveAppSettings();
             MessageBox.Show(ex.Message, "連線失敗", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -384,8 +405,9 @@ public partial class MainWindow : Window
         _modbus.Disconnect();
         SetUiConnected(false);
         TxtConnectionState.Text = "未連線";
-        TxtConnectionState.Foreground = Brushes.Black;
+        TxtConnectionState.Foreground = ConnIdleBrush;
         SetStatus("已斷開連線。");
+        TxtConnHint.Text = "已斷開";
         _log.Info("已斷開連線。");
     }
 
@@ -393,15 +415,18 @@ public partial class MainWindow : Window
     {
         if (TglPolling.IsChecked == true)
         {
-            TglPolling.Content = "輪詢 ON";
+            TglPolling.Content = "輪詢：開啟";
             ApplyPollIntervalsFromUi(save: true);
             if (_modbus.IsConnected)
                 _pollTimer.Start();
+            TxtConnHint.Text = "輪詢已開啟";
         }
         else
         {
-            TglPolling.Content = "輪詢 OFF";
+            TglPolling.Content = "輪詢：關閉";
             _pollTimer.Stop();
+            if (_modbus.IsConnected)
+                TxtConnHint.Text = "已連線";
         }
     }
 
@@ -420,7 +445,7 @@ public partial class MainWindow : Window
 
     private async Task PollTickAsync()
     {
-        if (!_modbus.IsConnected || _busy)
+        if (!_modbus.IsConnected || _busy || _handlingCommLoss)
             return;
 
         try
@@ -442,13 +467,102 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            SetStatus($"輪詢錯誤：{ex.Message}");
-            _log.Error($"輪詢錯誤：{ex.Message}");
+            if (IsLikelyCommunicationFailure(ex))
+            {
+                HandleCommunicationLost("自動輪詢", ex);
+            }
+            else
+            {
+                SetStatus($"輪詢錯誤：{ex.Message}");
+                _log.Error($"輪詢錯誤：{ex.Message}");
+            }
         }
         finally
         {
             _busy = false;
         }
+    }
+
+    /// <summary>
+    /// 判定是否為線路／閘道／逾時等通訊中斷（非裝置回傳的功能碼錯誤）。
+    /// </summary>
+    private static bool IsLikelyCommunicationFailure(Exception ex)
+    {
+        for (Exception? e = ex; e is not null; e = e.InnerException)
+        {
+            switch (e)
+            {
+                case TimeoutException:
+                case IOException:
+                case System.Net.Sockets.SocketException:
+                case ObjectDisposedException:
+                    return true;
+                case InvalidOperationException when e.Message.Contains("尚未連線", StringComparison.Ordinal):
+                    return true;
+            }
+
+            var name = e.GetType().Name;
+            // NModbus / serial adapters often surface these
+            if (name.Contains("IOException", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("Socket", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("Timeout", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            var msg = e.Message ?? string.Empty;
+            if (msg.Contains("timed out", StringComparison.OrdinalIgnoreCase) ||
+                msg.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
+                msg.Contains("broken pipe", StringComparison.OrdinalIgnoreCase) ||
+                msg.Contains("forcibly closed", StringComparison.OrdinalIgnoreCase) ||
+                msg.Contains("connection", StringComparison.OrdinalIgnoreCase) &&
+                (msg.Contains("reset", StringComparison.OrdinalIgnoreCase) ||
+                 msg.Contains("abort", StringComparison.OrdinalIgnoreCase) ||
+                 msg.Contains("refus", StringComparison.OrdinalIgnoreCase)))
+                return true;
+        }
+
+        return false;
+    }
+
+    private void HandleCommunicationLost(string context, Exception ex)
+    {
+        if (_handlingCommLoss)
+            return;
+
+        _handlingCommLoss = true;
+        try
+        {
+            _pollTimer.Stop();
+            if (TglPolling.IsChecked == true)
+                TglPolling.IsChecked = false;
+
+            try { _modbus.Disconnect(); } catch { /* ignore */ }
+
+            SetUiConnected(false);
+            TxtConnectionState.Text = "通訊中斷";
+            TxtConnectionState.Foreground = ConnErrBrush;
+            SetStatus($"通訊中斷（{context}）：{ex.Message}");
+            TxtConnHint.Text = "通訊中斷";
+            _log.Error($"通訊中斷 @ {context}：{ex.Message}");
+
+            MessageBox.Show(
+                $"偵測到通訊中斷，已自動斷開連線。\n\n發生於：{context}\n原因：{ex.Message}\n\n請檢查：\n• COM 埠／網路線是否拔除\n• RS485↔Ethernet 閘道是否正常\n• 裝置電源與站號設定\n\n確認後請重新連線。",
+                "通訊中斷",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _handlingCommLoss = false;
+        }
+    }
+
+    /// <summary>手動操作失敗時：若為通訊中斷則彈窗並清連線；否則回傳 false 讓呼叫端自行提示。</summary>
+    private bool TryHandleAsCommunicationLost(string context, Exception ex)
+    {
+        if (!IsLikelyCommunicationFailure(ex))
+            return false;
+        HandleCommunicationLost(context, ex);
+        return true;
     }
 
     private async Task ReadDashboardCoreAsync()
@@ -475,10 +589,13 @@ public partial class MainWindow : Window
         _decimalPoint = dp is >= 0 and <= 1 ? dp : 0;
         TxtPv.Text = NtRegisterMap.FormatSigned(pv, _decimalPoint);
         TxtSvDisplay.Text = NtRegisterMap.FormatSigned(sv, _decimalPoint);
+        _lastPvRaw = pv;
+        _lastSvRaw = sv;
+        UpdatePvForeground();
 
         _suppressControllerEvent = true;
         TglController.IsChecked = onOff == 0;
-        TglController.Content = onOff == 0 ? "ON（可控制輸出）" : "OFF（輸出禁用）";
+        TglController.Content = onOff == 0 ? "ON（輸出可控制）" : "OFF（輸出禁用）";
         _suppressControllerEvent = false;
 
         SetLamp(LampOut1, (status & 0x0001) != 0, LampOnGreen);
@@ -531,11 +648,14 @@ public partial class MainWindow : Window
             var text = NtRegisterMap.FormatSigned(raw, _decimalPoint);
             TxtSvDisplay.Text = text;
             TxtSvInput.Text = text;
+            _lastSvRaw = raw;
+            UpdatePvForeground();
             SetStatus($"已讀取 SV ({NtRegisterMap.Sv:X4}h) = {text}");
             _log.Info($"讀取 SV @0x{NtRegisterMap.Sv:X4} = {text}");
         }
         catch (Exception ex)
         {
+            if (TryHandleAsCommunicationLost("讀取 SV", ex)) return;
             _log.Error($"讀取 SV 失敗：{ex.Message}");
             MessageBox.Show(ex.Message, "讀取 SV 失敗", MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -570,6 +690,8 @@ public partial class MainWindow : Window
             var verified = await Task.Run(() => _modbus.WriteAndVerify(NtRegisterMap.Sv, value));
             var text = NtRegisterMap.FormatSigned(verified, _decimalPoint);
             TxtSvDisplay.Text = text;
+            _lastSvRaw = verified;
+            UpdatePvForeground();
             var ok = verified == value;
             SetStatus(ok ? $"已寫入並回讀確認 SV = {text}" : $"SV 寫入後回讀不一致：期望 {value}，實際 {verified}");
             if (ok) _log.Info($"寫入 SV 成功並回讀確認 = {text}");
@@ -577,6 +699,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            if (TryHandleAsCommunicationLost("寫入 SV", ex)) return;
             _log.Error($"寫入 SV 失敗：{ex.Message}");
             MessageBox.Show(ex.Message, "寫入 SV 失敗", MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -596,7 +719,7 @@ public partial class MainWindow : Window
         {
             SetBusy(true);
             var verified = await Task.Run(() => _modbus.WriteAndVerify(NtRegisterMap.ControllerOnOff, value));
-            TglController.Content = verified == 0 ? "ON（可控制輸出）" : "OFF（輸出禁用）";
+            TglController.Content = verified == 0 ? "ON（輸出可控制）" : "OFF（輸出禁用）";
             if (verified != value)
             {
                 _suppressControllerEvent = true;
@@ -616,6 +739,7 @@ public partial class MainWindow : Window
             _suppressControllerEvent = true;
             TglController.IsChecked = !TglController.IsChecked;
             _suppressControllerEvent = false;
+            if (TryHandleAsCommunicationLost("寫入 Controller ON/OFF", ex)) return;
             _log.Error($"寫入 ON/OFF 失敗：{ex.Message}");
             MessageBox.Show(ex.Message, "寫入 Controller ON/OFF 失敗", MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -643,6 +767,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            if (TryHandleAsCommunicationLost($"讀取 {param.Code}", ex)) return;
             _log.Error($"讀取 {param.Code} 失敗：{ex.Message}");
             MessageBox.Show(ex.Message, $"讀取 {param.Code} 失敗", MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -705,6 +830,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            if (TryHandleAsCommunicationLost($"寫入 {param.Code}", ex)) return;
             _log.Error($"寫入 {param.Code} 失敗：{ex.Message}");
             MessageBox.Show(ex.Message, $"寫入 {param.Code} 失敗", MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -808,6 +934,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            if (TryHandleAsCommunicationLost("套用站點預設", ex)) return;
             SetStatus($"套用站點預設失敗：{ex.Message}");
             _log.Error($"套用站點預設失敗：{ex.Message}");
             MessageBox.Show(
@@ -880,6 +1007,20 @@ public partial class MainWindow : Window
     private static void SetLamp(Ellipse lamp, bool on, SolidColorBrush onBrush)
         => lamp.Fill = on ? onBrush : LampOff;
 
+    /// <summary>PV &gt; SV 時以 danger 色顯示；否則為正常綠。</summary>
+    private void UpdatePvForeground()
+    {
+        if (_lastPvRaw is null || _lastSvRaw is null)
+        {
+            TxtPv.Foreground = PvOkBrush;
+            return;
+        }
+
+        short pv = unchecked((short)_lastPvRaw.Value);
+        short sv = unchecked((short)_lastSvRaw.Value);
+        TxtPv.Foreground = pv > sv ? PvDangerBrush : PvOkBrush;
+    }
+
     private bool EnsureConnected()
     {
         if (_modbus.IsConnected) return true;
@@ -905,6 +1046,13 @@ public partial class MainWindow : Window
         BtnApplySiteDefaults.IsEnabled = connected;
         CmbProfiles.IsEnabled = !connected;
         TxtProfileName.IsEnabled = !connected;
+
+        if (!connected)
+        {
+            _lastPvRaw = null;
+            _lastSvRaw = null;
+            UpdatePvForeground();
+        }
     }
 
     private void SetBusy(bool busy)
