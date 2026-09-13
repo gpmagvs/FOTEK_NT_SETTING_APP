@@ -1,7 +1,7 @@
-﻿<Application x:Class="TemperatureControllerAPP.App"
+<Application x:Class="FOTEK_NT_SETTING_APP.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:TemperatureControllerAPP"
+             xmlns:local="clr-namespace:FOTEK_NT_SETTING_APP"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
          

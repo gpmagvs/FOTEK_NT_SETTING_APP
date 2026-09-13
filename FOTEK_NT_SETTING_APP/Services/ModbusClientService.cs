@@ -3,7 +3,7 @@ using System.Net.Sockets;
 using NModbus;
 using NModbus.Serial;
 
-namespace TemperatureControllerAPP.Services;
+namespace FOTEK_NT_SETTING_APP.Services;
 
 public enum ModbusTransportKind
 {

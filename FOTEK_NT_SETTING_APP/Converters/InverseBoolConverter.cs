@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Windows.Data;
 
-namespace TemperatureControllerAPP.Converters;
+namespace FOTEK_NT_SETTING_APP.Converters;
 
 public sealed class InverseBoolConverter : IValueConverter
 {

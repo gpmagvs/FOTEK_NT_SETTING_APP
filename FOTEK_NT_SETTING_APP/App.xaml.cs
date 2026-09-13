@@ -1,8 +1,8 @@
-﻿using System.Configuration;
+using System.Configuration;
 using System.Data;
 using System.Windows;
 
-namespace TemperatureControllerAPP;
+namespace FOTEK_NT_SETTING_APP;
 
 /// <summary>
 /// Interaction logic for App.xaml

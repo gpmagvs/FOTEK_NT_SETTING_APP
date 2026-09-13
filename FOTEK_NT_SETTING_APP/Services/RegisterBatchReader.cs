@@ -1,4 +1,4 @@
-namespace TemperatureControllerAPP.Services;
+namespace FOTEK_NT_SETTING_APP.Services;
 
 /// <summary>
 /// Groups scattered holding-register addresses into consecutive ranges

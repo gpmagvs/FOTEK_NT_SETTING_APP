@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text.Json;
 
-namespace TemperatureControllerAPP.Services;
+namespace FOTEK_NT_SETTING_APP.Services;
 
 public sealed class ConnectionSettings
 {
@@ -34,7 +34,7 @@ public static class ConnectionSettingsStore
 
     public static string DirectoryPath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "TemperatureControllerAPP");
+            "FOTEK_NT_SETTING_APP");
 
     public static string FilePath => Path.Combine(DirectoryPath, "connection-settings.json");
 
@@ -113,6 +113,23 @@ public static class ConnectionSettingsStore
         TcpHost = s.TcpHost,
         TcpPort = s.TcpPort
     };
+
+
+    private static void MigrateLegacySettingsIfNeeded()
+    {
+        if (File.Exists(SettingsPath))
+            return;
+
+        var legacyDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "TemperatureControllerAPP");
+        var legacyFile = Path.Combine(legacyDir, "connection-settings.json");
+        if (!File.Exists(legacyFile))
+            return;
+
+        Directory.CreateDirectory(SettingsDirectory);
+        File.Copy(legacyFile, SettingsPath, overwrite: false);
+    }
 
     private static AppSettings CreateDefault()
     {

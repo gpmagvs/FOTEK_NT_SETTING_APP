@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Threading;
 
-namespace TemperatureControllerAPP.Services;
+namespace FOTEK_NT_SETTING_APP.Services;
 
 public sealed class CommLogEntry
 {

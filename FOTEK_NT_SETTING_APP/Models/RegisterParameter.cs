@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace TemperatureControllerAPP.Models;
+namespace FOTEK_NT_SETTING_APP.Models;
 
 /// <summary>
 /// NT Series holding-register parameter row for DataGrid binding.

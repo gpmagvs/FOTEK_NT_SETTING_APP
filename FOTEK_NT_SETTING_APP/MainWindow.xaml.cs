@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.IO.Ports;
 using System.Windows;
 using System.Windows.Controls;
@@ -6,10 +6,10 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using Microsoft.Win32;
-using TemperatureControllerAPP.Models;
-using TemperatureControllerAPP.Services;
+using FOTEK_NT_SETTING_APP.Models;
+using FOTEK_NT_SETTING_APP.Services;
 
-namespace TemperatureControllerAPP;
+namespace FOTEK_NT_SETTING_APP;
 
 public partial class MainWindow : Window
 {

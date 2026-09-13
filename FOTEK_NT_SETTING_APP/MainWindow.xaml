@@ -1,9 +1,9 @@
-﻿<Window
+<Window
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:conv="clr-namespace:TemperatureControllerAPP.Converters"
-        xmlns:av="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="av" x:Class="TemperatureControllerAPP.MainWindow"
-        Title="NT Series 溫控器 — Modbus RTU / TCP"
+        xmlns:conv="clr-namespace:FOTEK_NT_SETTING_APP.Converters"
+        xmlns:av="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="av" x:Class="FOTEK_NT_SETTING_APP.MainWindow"
+        Title="FOTEK NT Setting — Modbus RTU / TCP"
         MinWidth="1100"
         MinHeight="640"
         WindowStartupLocation="CenterScreen"

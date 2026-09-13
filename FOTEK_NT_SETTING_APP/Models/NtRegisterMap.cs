@@ -1,6 +1,6 @@
 using System.Collections.ObjectModel;
 
-namespace TemperatureControllerAPP.Models;
+namespace FOTEK_NT_SETTING_APP.Models;
 
 /// <summary>
 /// NT Series register map (Protocol Base 0), arranged like the manual's 3-column sheet.
