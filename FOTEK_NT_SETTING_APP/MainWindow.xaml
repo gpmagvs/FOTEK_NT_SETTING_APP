@@ -618,11 +618,11 @@
                     <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0">
                         <RadioButton x:Name="RbRtu" Content="Modbus RTU" Style="{StaticResource ModeChip}" IsChecked="True"
                                      Checked="TransportMode_Changed" ToolTip="序列埠 COM 直連"/>
-                        <RadioButton x:Name="RbTcp" Content="Modbus TCP" Style="{StaticResource ModeChip}"
-                                     Checked="TransportMode_Changed" ToolTip="Ethernet / RS485 閘道"/>
+                        <RadioButton x:Name="RbTcp" Content="RTU over TCP" Style="{StaticResource ModeChip}"
+                                     Checked="TransportMode_Changed" ToolTip="Ethernet 透明閘道：Socket 傳 RTU 幀（非 Modbus TCP/MBAP）"/>
                         <TextBlock x:Name="LblUnitId" Text="Slave ID" Style="{StaticResource InlineLabel}" Margin="6,0,4,0"/>
                         <TextBox x:Name="TxtSlaveId" Width="48" Text="1" VerticalContentAlignment="Center"
-                                 ToolTip="RTU=Slave ID；TCP 閘道時通常對應溫控器站號"/>
+                                 ToolTip="溫控器站號（RTU Slave ID；TCP 閘道時同樣填此站號）"/>
                     </StackPanel>
 
                     <Grid x:Name="PanelRtu" VerticalAlignment="Center">
@@ -688,7 +688,7 @@
                         <DockPanel Grid.Column="1" Margin="0,0,8,0" LastChildFill="True">
                             <TextBlock DockPanel.Dock="Left" Text="TCP Port" Style="{StaticResource InlineLabel}"/>
                             <TextBox x:Name="TxtTcpPort" Text="502" VerticalContentAlignment="Center"
-                                     ToolTip="預設 502"/>
+                                     ToolTip="透明閘道埠號，常見 10001；部分設備為 502"/>
                         </DockPanel>
                         <TextBlock Grid.Column="2" Text="閘道轉 RS485：Unit ID = 溫控器站號；鮑率在模組端設定"
                                    Opacity="0.6" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>

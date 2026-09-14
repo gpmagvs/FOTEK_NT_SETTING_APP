@@ -344,13 +344,13 @@ public partial class MainWindow : Window
 
                 if (!int.TryParse(TxtTcpPort.Text.Trim(), out var tcpPort) || tcpPort is < 1 or > 65535)
                 {
-                    MessageBox.Show("TCP Port 必須為 1–65535（預設 502）。", "連線", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show("TCP Port 必須為 1–65535（常見為 10001 或 502）。", "連線", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
-                _log.Info($"連線 Modbus TCP {host}:{tcpPort}, UnitId={slaveId} …");
+                _log.Info($"連線 RTU-over-TCP {host}:{tcpPort}, SlaveId={slaveId} …");
                 await Task.Run(() => _modbus.ConnectTcp(host, tcpPort, slaveId));
-                statusText = $"已連線 Modbus TCP：{host}:{tcpPort}, Unit ID={slaveId}";
+                statusText = $"已連線 RTU-over-TCP：{host}:{tcpPort}, Slave ID={slaveId}";
             }
             else
             {
@@ -373,7 +373,7 @@ public partial class MainWindow : Window
             SetUiConnected(true);
             SetStatus(statusText + "  ·  正在讀取裝置資料…");
             TxtConnHint.Text = "讀取中…";
-            TxtConnectionState.Text = IsTcpMode ? "已連線 (TCP)" : "已連線 (RTU)";
+            TxtConnectionState.Text = IsTcpMode ? "已連線 (RTU over TCP)" : "已連線 (RTU)";
             TxtConnectionState.Foreground = ConnOkBrush;
             _log.Info(statusText);
 

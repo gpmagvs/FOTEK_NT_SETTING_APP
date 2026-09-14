@@ -7,13 +7,16 @@ namespace FOTEK_NT_SETTING_APP.Services;
 
 public enum ModbusTransportKind
 {
+    /// <summary>序列埠直連 Modbus RTU。</summary>
     Rtu,
+    /// <summary>TCP socket 上傳輸 Modbus RTU 幀（透明閘道，非 MBAP）。</summary>
     Tcp
 }
 
 /// <summary>
 /// Thread-safe Modbus master for NT Series controllers.
-/// Supports Modbus RTU (serial) and Modbus TCP (e.g. RS485↔Ethernet gateway on port 502).
+/// Supports Modbus RTU (serial) and RTU-over-TCP via transparent RS485↔Ethernet gateway
+/// (socket 上傳輸 RTU 幀 + CRC，非 Modbus TCP / MBAP)。
 /// Uses Protocol Base 0 addressing (register hex is the Modbus address).
 /// </summary>
 public sealed class ModbusClientService : IDisposable
@@ -21,6 +24,7 @@ public sealed class ModbusClientService : IDisposable
     private readonly object _sync = new();
     private SerialPort? _port;
     private TcpClient? _tcpClient;
+    private TcpClientStreamResource? _tcpStream;
     private IModbusMaster? _master;
     private ModbusTransportKind _transport;
     private bool _disposed;
@@ -98,8 +102,9 @@ public sealed class ModbusClientService : IDisposable
     }
 
     /// <summary>
-    /// Connect via Modbus TCP (typical for RS485-to-Ethernet converters).
-    /// Unit ID still maps to the RS485 slave address on most gateways.
+    /// 經 Ethernet 閘道連線：以 TCP socket 承載 Modbus RTU 幀（與 COM RTU 相同 PDU/CRC）。
+    /// 適用透明串列裝置伺服器；不適用「真」Modbus TCP 閘道。
+    /// Unit ID 對應 RS-485 Slave Address。
     /// </summary>
     public void ConnectTcp(
         string host,
@@ -120,6 +125,7 @@ public sealed class ModbusClientService : IDisposable
             DisconnectInternal();
 
             var client = new TcpClient();
+            TcpClientStreamResource? stream = null;
             try
             {
                 // Connect with timeout
@@ -132,18 +138,24 @@ public sealed class ModbusClientService : IDisposable
 
                 connectTask.GetAwaiter().GetResult();
 
+                stream = new TcpClientStreamResource(client);
+                stream.ReadTimeout = readTimeoutMs;
+                stream.WriteTimeout = writeTimeoutMs;
+
                 var factory = new ModbusFactory();
-                var master = factory.CreateMaster(client);
+                var master = factory.CreateRtuMaster(stream);
                 master.Transport.ReadTimeout = readTimeoutMs;
                 master.Transport.WriteTimeout = writeTimeoutMs;
 
                 _tcpClient = client;
+                _tcpStream = stream;
                 _master = master;
                 _transport = ModbusTransportKind.Tcp;
                 SlaveId = unitId;
             }
             catch
             {
+                try { stream?.Dispose(); } catch { /* ignore */ }
                 try { client.Dispose(); } catch { /* ignore */ }
                 throw;
             }
@@ -228,6 +240,9 @@ public sealed class ModbusClientService : IDisposable
     {
         try { _master?.Dispose(); } catch { /* ignore */ }
         _master = null;
+
+        try { _tcpStream?.Dispose(); } catch { /* ignore */ }
+        _tcpStream = null;
 
         try
         {
